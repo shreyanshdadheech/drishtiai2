@@ -39,29 +39,55 @@ export default function HomePage() {
   const navigate = useNavigate();
   
   useEffect(() => {
-    // Check authentication
-    const email = localStorage.getItem('email');
-    const password = localStorage.getItem('password');
+    try {
+      // Check authentication
+      const email = localStorage.getItem('email');
+      const password = localStorage.getItem('password');
 
-    if (!email || !password) {
+      if (!email || !password) {
+        navigate('/');
+        return;
+      }
+
+      loadPatients().catch(err => {
+        setError(`Failed to load patients: ${err instanceof Error ? err.message : 'Unknown error'}`);
+        setIsLoading(false);
+      });
+    } catch (err) {
+      setError(`Authentication error: ${err instanceof Error ? err.message : 'Unknown error'}`);
+      setIsLoading(false);
       navigate('/');
-      return;
     }
-
-    loadPatients();
   }, [navigate]);
 
   useEffect(() => {
-    const filtered = patients.filter(patient => {
-      const searchLower = searchQuery.toLowerCase();
-      return (
-        patient.firstname.toLowerCase().includes(searchLower) ||
-        patient.lastname.toLowerCase().includes(searchLower) ||
-        patient.pid.toLowerCase().includes(searchLower)
-      );
-    });
-    setFilteredPatients(filtered);
+    try {
+      const filtered = patients.filter(patient => {
+        if (!patient) return false;
+        
+        const searchLower = searchQuery.toLowerCase();
+        return (
+          (patient.firstname?.toLowerCase() || '').includes(searchLower) ||
+          (patient.lastname?.toLowerCase() || '').includes(searchLower) ||
+          (patient.pid?.toLowerCase() || '').includes(searchLower)
+        );
+      });
+      setFilteredPatients(filtered);
+    } catch (err) {
+      console.error('Error filtering patients:', err);
+      setFilteredPatients([]); // Reset to empty array on error
+      setError(`Error filtering patients: ${err instanceof Error ? err.message : 'Unknown error'}`);
+    }
   }, [searchQuery, patients]);
+
+  // Add cleanup on component unmount
+  useEffect(() => {
+    return () => {
+      setIsDialogOpen(false);
+      setShowConfigDialog(false);
+      setIsLoading(false);
+    };
+  }, []);
 
   const loadPatients = async () => {
     try {
@@ -73,7 +99,6 @@ export default function HomePage() {
         return;
       }
 
-      // Use getDatabasePaths helper
       const dbPaths = getDatabasePaths();
       const { data, error: readError } = await window.electron.readJsonFile(dbPaths.patient);
 
@@ -82,11 +107,25 @@ export default function HomePage() {
         return;
       }
 
-      // Ensure data is properly formatted and sorted
+      // Sort patients by createdAt date in descending order (newest first)
       if (Array.isArray(data)) {
-        const sortedPatients = data.sort((a, b) => 
-          a.firstname.localeCompare(b.firstname)
-        );
+        console.log('Patient dates before sorting:', data.slice(0, 5).map(p => ({
+          name: `${p.firstname} ${p.lastname}`,
+          creationdate: p.creationdate,
+          pid: p.pid
+        })));
+
+        const sortedPatients = data.sort((a, b) => {
+          const dateA = new Date(a.creationdate || 0);
+          const dateB = new Date(b.creationdate || 0);
+          return dateB.getTime() - dateA.getTime();
+        });
+        console.log('Patient dates after sorting:', sortedPatients.slice(0, 5).map(p => ({
+          name: `${p.firstname} ${p.lastname}`,
+          creationdate: p.creationdate,
+          pid: p.pid
+        })));
+  
         setPatients(sortedPatients);
         setFilteredPatients(sortedPatients);
         setError(null);
@@ -106,9 +145,20 @@ export default function HomePage() {
     loadPatients();
   };
 
-  const handlePatientSelect = (patientId: string) => {
-    navigate(`/patient/${patientId}`);
+  const handlePatientSelect = async (patientId: string, e: React.MouseEvent) => {
+    // Prevent event bubbling
+    e.preventDefault();
+    e.stopPropagation();
+    
+   try {
+    await navigate(`/patient/${patientId}`);
+    // Add this line to force window focus
+    await window.electron.focusWindow();
+  } catch (error) {
+    console.error('Navigation error:', error);
+  } finally {
     setIsDialogOpen(false);
+  }
   };
 
   if (isLoading) {
@@ -185,8 +235,13 @@ export default function HomePage() {
     );
   }
 
+  // Modify the Dialog components to have proper event handling
   return (
-    <div className="flex flex-col h-full items-center justify-center p-6">
+    <div className="flex flex-col h-full items-center justify-center p-6" 
+    onClick={(e) => {
+      e.preventDefault(); 
+      e.stopPropagation();
+    }}>
       <h1 className="text-4xl font-bold mb-4">Welcome</h1>
       
       <Button 
@@ -232,7 +287,7 @@ export default function HomePage() {
                   <TableRow 
                     key={patient._id}
                     className="cursor-pointer hover:bg-muted/50"
-                    onClick={() => handlePatientSelect(patient._id)}
+                    onClick={(e) => handlePatientSelect(patient._id, e)}
                   >
                     <TableCell className="font-medium">{patient.firstname}</TableCell>
                     <TableCell>{patient.lastname}</TableCell>

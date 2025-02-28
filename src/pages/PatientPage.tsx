@@ -65,6 +65,11 @@ export default function PatientPage() {
   const [genderValue, setGenderValue] = useState<GenderType>('2'); // Will be set based on patient data
   const [checkedImages, setCheckedImages] = useState<Set<string>>(new Set());
 
+  // Add these new state variables
+  const [startTime, setStartTime] = useState<Date | null>(null);
+  const [elapsedTime, setElapsedTime] = useState<string>('');
+  const [timerInterval, setTimerInterval] = useState<NodeJS.Timer | null>(null);
+
   useEffect(() => {
     loadAllData();
   }, [id]);
@@ -241,14 +246,14 @@ export default function PatientPage() {
         throw new Error('Quality check failed');
       }
       
-      let analysisText = `Image Quality: ${qualityData.model_response}\n`;
+      let analysisText = `Image Quality: \n`; //${qualityData.model_response}
       
       switch (qualityData.model_coef?.toString()) {
         case "0":
           analysisText += "Good image quality, no issues.";
           break;
         case "1":
-          analysisText += "Acceptable image quality, but could be improved.";
+          analysisText += "Moderate image quality, but could be improved.";
           break;
         case "2":
           analysisText += "Poor image quality. Please retake the image.";
@@ -273,6 +278,14 @@ export default function PatientPage() {
     });
   };
 
+  // Add this function to format elapsed time
+  const formatElapsedTime = (milliseconds: number): string => {
+    const seconds = Math.floor(milliseconds / 1000);
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = seconds % 60;
+    return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
+  };
+
   const handleSubmit = async () => {
     if (selectedImages.length === 0) {
       setAlertMessage('Please select at least one image.');
@@ -283,6 +296,20 @@ export default function PatientPage() {
       setAlertMessage('Cannot submit with rejected images. Please replace poor quality images.');
       return;
     }
+
+    // Start timing
+    const start = new Date();
+    setStartTime(start);
+    setElapsedTime('0:00');
+    
+    // Start timer interval
+    const interval = setInterval(() => {
+      const now = new Date();
+      const elapsed = now.getTime() - start.getTime();
+      setElapsedTime(formatElapsedTime(elapsed));
+    }, 1000);
+    
+    setTimerInterval(interval);
 
     setShowSubmitDialog(true);
     setSubmitStatus('Preparing submission...');
@@ -442,11 +469,23 @@ export default function PatientPage() {
       setSubmitMessage(responseData.message);
       console.log('Submission Response:', responseData);
       
+      // Clear timer interval
+      if (timerInterval) {
+        clearInterval(timerInterval);
+      }
+      
+      // Calculate final time
+      const endTime = new Date();
+      const totalTime = endTime.getTime() - start.getTime();
+      setElapsedTime(formatElapsedTime(totalTime));
+
       setTimeout(() => {
         setShowSubmitDialog(false);
         setSubmitStatus('');
         setSubmitProgress(0);
         setSubmitMessage('');
+        setElapsedTime('');
+        setStartTime(null);
       }, 3000);
 
     } catch (error) {
@@ -482,8 +521,22 @@ export default function PatientPage() {
       setSubmitError(errorMessage);
       setSubmitStatus('Error occurred');
       setSubmitProgress(0);
+      
+      // Clear timer interval on error
+      if (timerInterval) {
+        clearInterval(timerInterval);
+      }
     }
   };
+
+  // Add cleanup for timer interval
+  useEffect(() => {
+    return () => {
+      if (timerInterval) {
+        clearInterval(timerInterval);
+      }
+    };
+  }, [timerInterval]);
 
   const getImageBlob = async (filename: string): Promise<Blob> => {
     const serverPath = getStoredPath();
@@ -585,7 +638,7 @@ export default function PatientPage() {
           >
             <div className="flex items-center space-x-2">
               <RadioGroupItem value="2" id="dr_dme" />
-              <Label htmlFor="dr_dme">DR DME</Label>
+              <Label htmlFor="dr_dme">DR / DME</Label>
             </div>
             <div className="flex items-center space-x-2">
               <RadioGroupItem value="1" id="glaucoma" />
@@ -687,27 +740,27 @@ export default function PatientPage() {
             </Alert>
           )}
 
-          <div className="flex justify-between gap-4">
-            <Button 
-              className="flex-1" 
-              disabled={!selectedImages.length || !selectedReport || !areAllImagesChecked() || hasRejectedImages()}
-              onClick={handleSubmit}
-            >
-              {!selectedImages.length 
-                ? "Select Images" 
-                : !areAllImagesChecked()
-                ? "Checking Image Quality..."
-                : hasRejectedImages()
-                ? "Poor Quality Images Detected"
-                : "Submit for Analysis"}
-            </Button>
-            <Button 
-              variant="outline"
-              disabled
-              className="flex-1"
-            >
-              Montage
-            </Button>
+          <div className="flex justify-between gap-2 w-full">
+          <Button 
+    className="flex-1 min-w-0 whitespace-nowrap text-xs" 
+    disabled={!selectedImages.length || !selectedReport || !areAllImagesChecked() || hasRejectedImages()}
+    onClick={handleSubmit}
+  >
+    {!selectedImages.length 
+      ? "Select Images" 
+      : !areAllImagesChecked()
+      ? "Checking Quality..." 
+      : hasRejectedImages()
+      ? "Poor Quality" 
+      : "Submit Report"} 
+  </Button>
+  <Button 
+    variant="outline"
+    disabled
+    className="flex-1 min-w-0 whitespace-nowrap text-xs"
+  >
+    Montage (Coming Soon)
+  </Button>
           </div>
         </div>
       </div>
@@ -720,11 +773,21 @@ export default function PatientPage() {
             <AlertDialogDescription>
               {submitStatus}
               {submitProgress > 0 && !submitError && (
-                <Progress value={submitProgress} className="mt-2" />
+                <>
+                  <Progress value={submitProgress} className="mt-2" />
+                  <div className="text-sm text-muted-foreground mt-2 text-center">
+                    {startTime && `Elapsed Time: ${elapsedTime}`}
+                  </div>
+                </>
               )}
               {submitMessage && (
                 <div className="mt-4 text-green-600 font-medium">
                   {submitMessage}
+                  {startTime && (
+                    <div className="text-sm text-muted-foreground mt-1">
+                      Total processing time: {elapsedTime}
+                    </div>
+                  )}
                 </div>
               )}
               {submitError && (
@@ -733,17 +796,17 @@ export default function PatientPage() {
                 </div>
               )}
             </AlertDialogDescription>
+            <AlertDialogFooter>
+              {submitError ? (
+                <>
+                  <AlertDialogCancel onClick={() => setShowSubmitDialog(false)}>Close</AlertDialogCancel>
+                  <AlertDialogAction onClick={() => handleSubmit()}>Retry</AlertDialogAction>
+                </>
+              ) : submitMessage ? (
+                <AlertDialogAction onClick={() => setShowSubmitDialog(false)}>Close</AlertDialogAction>
+              ) : null}
+            </AlertDialogFooter>
           </AlertDialogHeader>
-          <AlertDialogFooter>
-            {submitError ? (
-              <>
-                <AlertDialogCancel onClick={() => setShowSubmitDialog(false)}>Close</AlertDialogCancel>
-                <AlertDialogAction onClick={() => handleSubmit()}>Retry</AlertDialogAction>
-              </>
-            ) : submitMessage ? (
-              <AlertDialogAction onClick={() => setShowSubmitDialog(false)}>Close</AlertDialogAction>
-            ) : null}
-          </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
     </div>

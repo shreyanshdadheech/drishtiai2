@@ -10,6 +10,7 @@ contextBridge.exposeInMainWorld('cryptoUtils', {
 });
 
 contextBridge.exposeInMainWorld('electron', {
+  focusWindow: () => ipcRenderer.invoke('focus-window'),
   enableScrollbar: () => {
     const style = document.createElement("style");
     style.innerHTML = `

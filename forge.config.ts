@@ -11,6 +11,7 @@ const config: ForgeConfig = {
   packagerConfig: {
     executableName: "Drishti AI",
     asar: true,
+    icon: "./icon"
   },
   rebuildConfig: {},
   makers: [
@@ -18,6 +19,7 @@ const config: ForgeConfig = {
     new MakerZIP({}, ["darwin"]),
     new MakerRpm({}),
     new MakerDeb({}),
+    
   ],
   plugins: [
     new VitePlugin({

@@ -8,7 +8,9 @@ import {
   REACT_DEVELOPER_TOOLS,
 } from "electron-devtools-installer";
 import { dialog } from 'electron';
-import * as fs from 'fs/promises';
+import * as fsPromises from 'fs/promises';
+import fs from 'fs';
+
 
 const inDevelopment = process.env.NODE_ENV === "development";
 
@@ -19,102 +21,111 @@ function createWindow() {
     height: 670,
     frame: false,
     titleBarStyle: 'hidden',
-    webPreferences: {{
+    icon: path.join(__dirname, "icon.ico"), // <-- Set your icon here
+    webPreferences: {
+      webSecurity:false,
       devTools: inDevelopment,
       contextIsolation: true,
       nodeIntegration: true,
       nodeIntegrationInSubFrames: false,
       preload: preload,
-      webSecurity: false,  // ⚠️ Disables security (not recommended for production)
-      contextIsolation: true,
-    },nodeIntegration: true,
-  }); nodeIntegrationInSubFrames: false,
+      enableWebSQL: false,
+      spellcheck: false,
+      backgroundThrottling: false
+    },
+  });
   registerListeners(mainWindow);
-      webSecurity: false,  // ⚠️ Disables security (not recommended for production)
+
   if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
     mainWindow.loadURL(MAIN_WINDOW_VITE_DEV_SERVER_URL);
   } else {
-    mainWindow.loadFile(Window);
-      path.join(__dirname, `../renderer/${MAIN_WINDOW_VITE_NAME}/index.html`),
-    );MAIN_WINDOW_VITE_DEV_SERVER_URL) {
-  } mainWindow.loadURL(MAIN_WINDOW_VITE_DEV_SERVER_URL);
-} } else {
     mainWindow.loadFile(
-async function installExtensions() {rer/${MAIN_WINDOW_VITE_NAME}/index.html`),
+      path.join(__dirname, `../renderer/${MAIN_WINDOW_VITE_NAME}/index.html`),
+    );
+  }
+}
+
+async function installExtensions() {
   try {
     const result = await installExtension(REACT_DEVELOPER_TOOLS);
     console.log(`Extensions installed successfully: ${result.name}`);
   } catch {
     console.error("Failed to install extensions");
-  }ry {
-}   const result = await installExtension(REACT_DEVELOPER_TOOLS);
-    console.log(`Extensions installed successfully: ${result.name}`);
+  }
+}
+
 app.whenReady().then(createWindow).then(installExtensions);
-    console.error("Failed to install extensions");
+// Add this after your window creation code
+app.on('browser-window-created', (_, window) => {
+  window.on('ready-to-show', () => {
+    window.show();
+    window.focus();
+  });
+});
 //osX only
 app.on("window-all-closed", () => {
   if (process.platform !== "darwin") {
-    app.quit();.then(createWindow).then(installExtensions);
-  }
-});sX only
-app.on("window-all-closed", () => {
-app.on("activate", () => { "darwin") {
-  if (BrowserWindow.getAllWindows().length === 0) {
-    createWindow();
+    app.quit();
   }
 });
-//osX only endse", () => {
+
+app.on('activate', () => {
   if (BrowserWindow.getAllWindows().length === 0) {
+    createWindow();
+  } else {
+    BrowserWindow.getAllWindows()[0].focus();
+  }
+});
+// Add this after your existing IPC handlers
+ipcMain.handle('focus-window', () => {
+  const windows = BrowserWindow.getAllWindows();
+  if (windows.length > 0) {
+    const mainWindow = windows[0];
+    if (mainWindow.isMinimized()) {
+      mainWindow.restore();
+    }
+    mainWindow.focus();
+    return true;
+  }
+  return false;
+});
+//osX only ends
+
 ipcMain.handle('show-open-dialog', async (_, options) => {
   return dialog.showOpenDialog(options);
 });
-//osX only ends
-// Add this IPC handler for path operations
-ipcMain.handle('join-paths', (_, ...parts) => {tions) => {
-  return path.join(...parts);g(options);
+
+// Add IPC handler for file reading
+ipcMain.handle('read-json-file', async (_, filePath: string) => {
+  try {
+    const content = await fsPromises.readFile(filePath, 'utf-8');
+    const lines = content.trim().split('\n');
+    const jsonArray = lines.map(line => JSON.parse(line));
+    return { data: jsonArray, error: null };
+  } catch (error) {
+    console.error('Error reading file:', error);
+    return { 
+      data: null, 
+      error: error instanceof Error ? error.message : 'Unknown error' 
+    };
+  }
 });
 
-// Update the read-json-file handlerrations
-ipcMain.handle('read-json-file', async (_, filePath: string) => {
-  try {n path.join(...parts);
-    // Normalize path for the operating system
-    const normalizedPath = path.normalize(filePath);
-    const content = await fs.readFile(normalizedPath, 'utf-8');
-    const lines = content.trim().split('\n');lePath: string) => {
-    const jsonArray = lines.map(line => JSON.parse(line));
-    return { data: jsonArray, error: null };em
-  } catch (error) {dPath = path.normalize(filePath);
-    console.error('Error reading file:', error);Path, 'utf-8');
-    return { es = content.trim().split('\n');
-      data: null, y = lines.map(line => JSON.parse(line));
-      error: error instanceof Error ? error.message : 'Unknown error' 
-    };tch (error) {
-  } console.error('Error reading file:', error);
-}); return { 
-      data: null, 
+ipcMain.handle('read-binary-file', async (event, filePath: string) => {
+  try {
+   // Remove 'file://' from the file path
+   const normalizedPath = filePath.startsWith('file://')
+   ? new URL(filePath).pathname
+   : filePath;
 
+ // Ensure the path is correctly formatted for the current platform
+ const platformPath = path.normalize(normalizedPath);
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-});  if (win) win.close();  const win = BrowserWindow.getFocusedWindow();ipcMain.handle('window-close', () => {});  }    }      win.maximize();    } else {      win.unmaximize();    if (win.isMaximized()) {  if (win) {  const win = BrowserWindow.getFocusedWindow();ipcMain.handle('window-maximize', () => {});  if (win) win.minimize();  const win = BrowserWindow.getFocusedWindow();ipcMain.handle('window-minimize', () => {// Add these IPC handlers      error: error instanceof Error ? error.message : 'Unknown error' 
-    };
+ // Read the file as a Buffer
+ const fileBuffer = fs.readFileSync(platformPath); // Change to readFileSync for synchronous reading
+ return fileBuffer; // Return the binary data to the renderer
+  } catch (error) {
+    console.error('Error reading binary file:', error);
+    throw new Error('Failed to read binary file');
   }
 });
