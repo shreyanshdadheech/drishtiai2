@@ -1,10 +1,10 @@
 {
   appId: "com.bioscanai.drishti",
-  productName: "Drishti AI",
+  productName: "DrishtiAI",
   directories: {
     output: "release/${version}",
   },
-  files: ["dist", "dist-electron"],
+  files: ["dist", "dist-electron","node_modules"],
   mac: {
     target: ["dmg"],
     icon: "images/logo.png",

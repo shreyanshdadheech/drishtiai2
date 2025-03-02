@@ -113,18 +113,16 @@ export default function HomePage() {
           name: `${p.firstname} ${p.lastname}`,
           creationdate: p.creationdate,
           pid: p.pid
-        })));
+        })
+      
+      ));
 
         const sortedPatients = data.sort((a, b) => {
           const dateA = new Date(a.creationdate || 0);
           const dateB = new Date(b.creationdate || 0);
           return dateB.getTime() - dateA.getTime();
         });
-        console.log('Patient dates after sorting:', sortedPatients.slice(0, 5).map(p => ({
-          name: `${p.firstname} ${p.lastname}`,
-          creationdate: p.creationdate,
-          pid: p.pid
-        })));
+    
   
         setPatients(sortedPatients);
         setFilteredPatients(sortedPatients);
@@ -242,7 +240,7 @@ export default function HomePage() {
       e.preventDefault(); 
       e.stopPropagation();
     }}>
-      <h1 className="text-4xl font-bold mb-4">Welcome</h1>
+      <h1 className="text-4xl font-bold mb-4 select-none">Welcome</h1>
       
       <Button 
         size="lg"

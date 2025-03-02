@@ -9,10 +9,23 @@ import { FuseV1Options, FuseVersion } from "@electron/fuses";
 
 const config: ForgeConfig = {
   packagerConfig: {
-    executableName: "Drishti AI",
+    executableName: "DrishtiAI",
     asar: true,
+    
     icon: "./icon"
   },
+  publishers: [
+    {
+      name: '@electron-forge/publisher-github',
+      config: {
+        repository: {
+          owner: 'shreyanshdadheech',
+          name: 'drishtiai2'
+        },
+        prerelease: false
+      }
+    }
+  ],
   rebuildConfig: {},
   makers: [
     new MakerSquirrel({}),

@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain } from "electron";
+import { app, BrowserWindow, ipcMain,dialog } from "electron";
 import registerListeners from "./helpers/ipc/listeners-register";
 // "electron-squirrel-startup" seems broken when packaging with vite
 //import started from "electron-squirrel-startup";
@@ -7,13 +7,29 @@ import {
   installExtension,
   REACT_DEVELOPER_TOOLS,
 } from "electron-devtools-installer";
-import { dialog } from 'electron';
 import * as fsPromises from 'fs/promises';
 import fs from 'fs';
-
+import { autoUpdater  } from '../node_modules/electron-updater';
+import log from '../node_modules/electron-log';
+// Configure logging
+log.transports.file.level = 'debug';
+log.transports.file.resolvePathFn = () => path.join(app.getPath('userData'), 'logs/main.log');
+log.transports.console.level = 'debug';
 
 const inDevelopment = process.env.NODE_ENV === "development";
+// Configure auto-updater
+autoUpdater.autoDownload = false;
+autoUpdater.autoInstallOnAppQuit = true;
+// Add these configurations
+autoUpdater.setFeedURL({
+  provider: 'github',
+  owner: 'shreyanshdadheech',
+  repo: 'drishtiai2',
+  private: false
+});
 
+autoUpdater.logger = log;
+log.info('App starting...');
 function createWindow() {
   const preload = path.join(__dirname, "preload.js");
   const mainWindow = new BrowserWindow({
@@ -34,6 +50,7 @@ function createWindow() {
       backgroundThrottling: false
     },
   });
+  setupAutoUpdater(mainWindow);
   registerListeners(mainWindow);
 
   if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
@@ -54,8 +71,111 @@ async function installExtensions() {
   }
 }
 
-app.whenReady().then(createWindow).then(installExtensions);
-// Add this after your window creation code
+
+// Replace the auto-updater configuration section
+function setupAutoUpdater(mainWindow: BrowserWindow) {
+  if (inDevelopment) return;
+
+  autoUpdater.logger = log;
+  autoUpdater.autoDownload = false;
+  autoUpdater.autoInstallOnAppQuit = true;
+
+  // Update events with window notifications
+  autoUpdater.on("error", (error) => {
+    log.error('Auto-updater error:', error);
+    mainWindow.webContents.send('update-error', error.message);
+  });
+
+  autoUpdater.on("checking-for-update", () => {
+    log.info('Checking for updates...');
+    mainWindow.webContents.send('checking-update');
+  });
+
+  autoUpdater.on("update-available", (info) => {
+    log.info('Update available:', info);
+    dialog.showMessageBox(mainWindow, {
+      type: 'info',
+      title: 'Update Available',
+      message: `Version ${info.version} is available. Would you like to download it now?`,
+      buttons: ['Download', 'Later'],
+      defaultId: 0
+    }).then(({ response }) => {
+      if (response === 0) {
+        autoUpdater.downloadUpdate();
+      }
+    });
+  });
+
+  autoUpdater.on("download-progress", (progress) => {
+    log.info(`Download progress: ${progress.percent}%`);
+    mainWindow.webContents.send('download-progress', progress.percent);
+  });
+
+  autoUpdater.on("update-downloaded", (info) => {
+    log.info('Update downloaded:', info);
+    dialog.showMessageBox(mainWindow, {
+      type: 'info',
+      title: 'Update Ready',
+      message: 'Update downloaded. Would you like to install it now?',
+      buttons: ['Install and Restart', 'Later'],
+      defaultId: 0
+    }).then(({ response }) => {
+      if (response === 0) {
+        autoUpdater.quitAndInstall(false, true);
+      }
+    });
+  });
+
+  // Check for updates every hour
+  setInterval(() => {
+    autoUpdater.checkForUpdates().catch(err => {
+      log.error('Error checking for updates:', err);
+    });
+  }, 60 * 60 * 1000);
+}
+
+// Modify createWindow function to use setupAutoUpdater
+
+
+// Add these IPC handlers
+ipcMain.handle('check-for-updates', () => {
+  if (!inDevelopment) {
+    return autoUpdater.checkForUpdates();
+  }
+});
+
+ipcMain.handle('start-download', () => {
+  return autoUpdater.downloadUpdate();
+});
+
+ipcMain.handle('quit-and-install', () => {
+  autoUpdater.quitAndInstall(false, true);
+});
+
+
+
+
+
+
+
+
+
+
+
+
+app.whenReady().then(async () => {
+  createWindow();
+  
+  if (!inDevelopment) {
+    try {
+      await autoUpdater.checkForUpdates();
+    } catch (err) {
+      log.error('Initial update check failed:', err);
+    }
+  }
+  
+  await installExtensions();
+});// Add this after your window creation code
 app.on('browser-window-created', (_, window) => {
   window.on('ready-to-show', () => {
     window.show();

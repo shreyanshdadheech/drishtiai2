@@ -10,10 +10,10 @@ const msiCreator = new MSICreator({
     appDirectory: APP_DIR,
     outputDirectory: OUT_DIR,
 
-    description: 'Drishti AI',
-    exe: 'Drishti AI',
-    name: 'Drishti AI',
-    manufacturer: 'Drishti AI',
+    description: 'DrishtiAI',
+    exe: 'DrishtiAI',
+    name: 'DrishtiAI',
+    manufacturer: 'DrishtiAI',
     version: '1.0.0',
     ui: {
         chooseDirectory: true

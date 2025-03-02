@@ -31,6 +31,7 @@ import { getStoredPath, storePath } from "@/helpers/path_helpers";
 import fs from 'fs';
 import path from 'path';
 import { Eye, EyeOff, Download, RotateCw } from 'lucide-react';
+import { Progress } from "@/components/ui/progress"; // Add this import
 
 const DEFAULT_PATH = "C:\\Mediview\\resources\\server";
 
@@ -46,6 +47,11 @@ export default function NavigationMenu() {
   const [updateStatus, setUpdateStatus] = useState<'checking' | 'available' | 'up-to-date' | 'error' | null>(null);
   const [updateDialogOpen, setUpdateDialogOpen] = useState(false);
   const [updateProgress, setUpdateProgress] = useState(0);
+  useEffect(() => {
+    return () => {
+      window.electron?.removeUpdateProgressListener?.();
+    };
+  }, []);
 
   const handleBrowse = async () => {
     try {
@@ -89,42 +95,8 @@ export default function NavigationMenu() {
     setTimeout(() => setUpdateSuccess(false), 3000);
   };
 
-  const checkForUpdates = async () => {
-    try {
-      setUpdateStatus('checking');
-      setUpdateDialogOpen(true);
-      
-      const result = await window.electron.checkForUpdates();
-      
-      if (result.updateAvailable) {
-        setUpdateStatus('available');
-      } else {
-        setUpdateStatus('up-to-date');
-        setTimeout(() => setUpdateDialogOpen(false), 2000);
-      }
-    } catch (error) {
-      console.error('Update check failed:', error);
-      setUpdateStatus('error');
-    }
-  };
+  
 
-  const startUpdate = async () => {
-    try {
-      setUpdateStatus('checking');
-      
-      // Subscribe to download progress
-      window.electron.onUpdateProgress((progress) => {
-        setUpdateProgress(progress);
-      });
-      
-      await window.electron.startUpdate();
-      
-      // The app will restart automatically when update is ready
-    } catch (error) {
-      console.error('Update failed:', error);
-      setUpdateStatus('error');
-    }
-  };
 
   return (
     <div className="flex items-center justify-between px-4 select-none">
@@ -258,14 +230,8 @@ export default function NavigationMenu() {
                         </DialogFooter>
                       </DialogContent>
                     </Dialog>
-                    <DropdownMenuSeparator />
                  
-                    <DropdownMenuItem onSelect={(e) => {
-                      e.preventDefault();
-                      checkForUpdates();
-                    }}>
-                      Check for Updates
-                    </DropdownMenuItem>
+
                     <DropdownMenuSeparator />
 
                     <Dialog open={showLogoutDialog} onOpenChange={setShowLogoutDialog}>
@@ -306,57 +272,7 @@ export default function NavigationMenu() {
         </NavigationMenuBase>
       </div>
 
-      <Dialog open={updateDialogOpen} onOpenChange={setUpdateDialogOpen}>
-        <DialogContent className="sm:max-w-[425px]">
-          <DialogHeader>
-            <DialogTitle>Software Update</DialogTitle>
-            <DialogDescription>
-              {updateStatus === 'checking' && "Checking for updates..."}
-              {updateStatus === 'available' && "A new version is available!"}
-              {updateStatus === 'up-to-date' && "You're running the latest version."}
-              {updateStatus === 'error' && "Failed to check for updates."}
-            </DialogDescription>
-          </DialogHeader>
-          
-          <div className="my-4">
-            {updateStatus === 'checking' && (
-              <div className="flex items-center justify-center">
-                <RotateCw className="h-6 w-6 animate-spin" />
-              </div>
-            )}
-            
-            {updateStatus === 'available' && (
-              <>
-                <div className="mb-4">
-                  Would you like to update now? The application will restart automatically.
-                </div>
-                {updateProgress > 0 && (
-                  <Progress value={updateProgress} className="mb-2" />
-                )}
-              </>
-            )}
-          </div>
-
-          <DialogFooter>
-            {updateStatus === 'available' && !updateProgress && (
-              <>
-                <Button variant="outline" onClick={() => setUpdateDialogOpen(false)}>
-                  Later
-                </Button>
-                <Button onClick={startUpdate}>
-                  <Download className="mr-2 h-4 w-4" />
-                  Update Now
-                </Button>
-              </>
-            )}
-            {(updateStatus === 'up-to-date' || updateStatus === 'error') && (
-              <Button onClick={() => setUpdateDialogOpen(false)}>
-                Close
-              </Button>
-            )}
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      
     </div>
   );
 }

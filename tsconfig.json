@@ -17,6 +17,7 @@
     "paths": {
       "@/*": ["./src/*"]
     },
+    "typeRoots": ["./node_modules/@types", "./src/types"],
     "outDir": "dist",
     "moduleResolution": "node",
     "resolveJsonModule": true

@@ -14,7 +14,7 @@ contextBridge.exposeInMainWorld('electron', {
   enableScrollbar: () => {
     const style = document.createElement("style");
     style.innerHTML = `
-      html, body {
+      body {
           overflow: scroll !important;
           scrollbar-width: thin;
       }
@@ -38,12 +38,36 @@ contextBridge.exposeInMainWorld('electron', {
       const data = await fs.promises.readFile(path);
       return { data, error: null };
     } catch (error) {
-      return { data: null, error: error.message };
+      return { 
+        data: null, 
+        error: error instanceof Error ? error.message : 'Unknown error'
+      };
     }
   },
   minimizeWindow: () => ipcRenderer.invoke('window-minimize'),
   maximizeWindow: () => ipcRenderer.invoke('window-maximize'),
   closeWindow: () => ipcRenderer.invoke('window-close'),
+
+  checkForUpdates: () => ipcRenderer.invoke('check-for-updates'),
+  downloadUpdate: () => ipcRenderer.invoke('download-update'),
+  quitAndInstall: () => ipcRenderer.invoke('quit-and-install'),
+  onUpdateAvailable: (callback: (info: any) => void) => 
+    ipcRenderer.on('update-available', (_event, info) => callback(info)),
+  onUpdateNotAvailable: (callback: () => void) => 
+    ipcRenderer.on('update-not-available', callback),
+  onUpdateError: (callback: (err: any) => void) => 
+    ipcRenderer.on('update-error', (_event, err) => callback(err)),
+  onUpdateProgress: (callback: (progress: number) => void) => 
+    ipcRenderer.on('update-progress', (_event, progress) => callback(progress)),
+  onUpdateDownloaded: (callback: () => void) => 
+    ipcRenderer.on('update-downloaded', callback),
+  removeUpdateListeners: () => {
+    ipcRenderer.removeAllListeners('update-available');
+    ipcRenderer.removeAllListeners('update-not-available');
+    ipcRenderer.removeAllListeners('update-error');
+    ipcRenderer.removeAllListeners('update-progress');
+    ipcRenderer.removeAllListeners('update-downloaded');
+  }
 });
 
 // Make sure the process is defined
