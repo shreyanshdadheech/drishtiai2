@@ -13,6 +13,7 @@
   "scripts": {
     "windows": "npx electron-packager . drishti  --out=dist --overwrite --icon=icon.ico",
     "dist": "electron-builder",
+    "build:win":"electron-builder --win",
     "start": "electron-forge start",
     "package": "electron-forge package",
     "make": "electron-forge make --platform=win32 --arch=x64",
